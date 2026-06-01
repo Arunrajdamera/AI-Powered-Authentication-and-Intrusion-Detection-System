@@ -1,4 +1,4 @@
-# AI-Driven SIEM with Random Forest IDS
+# AI-Powered Authentication Monitoring and Intrusion Detection System
 
 ## Project Overview
 
