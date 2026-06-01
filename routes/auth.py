@@ -16,27 +16,165 @@ auth_bp = Blueprint("auth", __name__)
 PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,128}$")
 
 REGISTER_TEMPLATE = """
-<h1>Register</h1>
-{% with messages = get_flashed_messages() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endwith %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Create Account</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body{
+    background:linear-gradient(135deg,#0f172a,#1e293b);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-family:Segoe UI,sans-serif;
+}
+
+.auth-card{
+    width:450px;
+    padding:35px;
+    border-radius:20px;
+    background:white;
+    box-shadow:0 15px 35px rgba(0,0,0,.25);
+}
+
+.logo{
+    font-size:42px;
+    text-align:center;
+    margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="auth-card">
+
+<div class="logo">📝</div>
+
+<h2 class="text-center mb-4">Create Account</h2>
+
+{% with messages = get_flashed_messages() %}
+{% for message in messages %}
+<div class="alert alert-warning">{{ message }}</div>
+{% endfor %}
+{% endwith %}
+
 <form method="post">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <input name="email" type="email" required>
-  <input name="password" type="password" required>
-  <button type="submit">Register</button>
+
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+<div class="mb-3">
+<label>Email Address</label>
+<input class="form-control" name="email" type="email" required>
+</div>
+
+<div class="mb-3">
+<label>Password</label>
+<input class="form-control" name="password" type="password" required>
+</div>
+
+<button class="btn btn-success w-100">
+Create Account
+</button>
+
 </form>
+
+<div class="text-center mt-3">
+<a href="/login">Already have an account? Login</a>
+</div>
+
+</div>
+
+</body>
+</html>
 """
 
 LOGIN_TEMPLATE = """
-<h1>Login</h1>
-{% with messages = get_flashed_messages() %}{% for message in messages %}<p>{{ message }}</p>{% endfor %}{% endwith %}
-<form method="post">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <input name="email" type="email" required>
-  <input name="password" type="password" required>
-  <button type="submit">Login</button>
-</form>
-"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AI Security Login</title>
 
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body{
+    background:linear-gradient(135deg,#0f172a,#1e293b);
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-family:Segoe UI,sans-serif;
+}
+
+.auth-card{
+    width:450px;
+    padding:35px;
+    border-radius:20px;
+    background:white;
+    box-shadow:0 15px 35px rgba(0,0,0,.25);
+}
+
+.logo{
+    font-size:48px;
+    text-align:center;
+    margin-bottom:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="auth-card">
+
+<div class="logo">🔐</div>
+
+<h2 class="text-center">AI Security System</h2>
+
+<p class="text-center text-muted mb-4">
+Authentication & Intrusion Detection
+</p>
+
+{% with messages = get_flashed_messages() %}
+{% for message in messages %}
+<div class="alert alert-danger">{{ message }}</div>
+{% endfor %}
+{% endwith %}
+
+<form method="post">
+
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+<div class="mb-3">
+<label>Email Address</label>
+<input class="form-control" name="email" type="email" required>
+</div>
+
+<div class="mb-3">
+<label>Password</label>
+<input class="form-control" name="password" type="password" required>
+</div>
+
+<button class="btn btn-primary w-100">
+Secure Login
+</button>
+
+</form>
+
+<div class="text-center mt-3">
+<a href="/register">Create New Account</a>
+</div>
+
+</div>
+
+</body>
+</html>
+"""
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
