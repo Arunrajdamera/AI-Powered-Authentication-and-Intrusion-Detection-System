@@ -99,11 +99,33 @@ body{
 
 <div class="mb-4">
 
-<form method="post" action="{{ url_for('auth.logout') }}">
-<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<a href="{{ url_for('main.predict_ids') }}"
+   class="btn btn-primary me-2">
+   IDS Prediction
+</a>
+
+<a href="{{ url_for('admin.export_login_logs') }}"
+   class="btn btn-success me-2">
+   Export Login Logs
+</a>
+
+<a href="{{ url_for('admin.export_alerts') }}"
+   class="btn btn-warning me-3">
+   Export Alerts
+</a>
+
+<form method="post"
+      action="{{ url_for('auth.logout') }}"
+      class="d-inline">
+
+<input type="hidden"
+       name="csrf_token"
+       value="{{ csrf_token() }}">
+
 <button class="btn btn-danger">
 Logout
 </button>
+
 </form>
 
 </div>
@@ -120,6 +142,7 @@ Logout
 <th>ID</th>
 <th>Email</th>
 <th>Role</th>
+<th>Status</th>
 <th>Failed Logins</th>
 </tr>
 </thead>
@@ -131,8 +154,20 @@ Logout
 <td>{{ user.id }}</td>
 <td>{{ user.email }}</td>
 <td>{{ user.role.name }}</td>
-<td>{{ user.failed_login_count }}</td>
-</tr>
+
+<td>
+{% if user.is_locked %}
+<span class="badge bg-danger">
+Locked
+</span>
+{% else %}
+<span class="badge bg-success">
+Active
+</span>
+{% endif %}
+</td>
+
+<td>{{ user.failed_login_count }}</td></tr>
 {% endfor %}
 
 </tbody>
@@ -160,7 +195,26 @@ Logout
 {% for alert in alerts %}
 <tr>
 <td>{{ alert.id }}</td>
-<td>{{ alert.severity }}</td>
+<td>
+
+{% if alert.severity == 'high' %}
+<span class="badge bg-danger">
+High
+</span>
+
+{% elif alert.severity == 'medium' %}
+<span class="badge bg-warning text-dark">
+Medium
+</span>
+
+{% else %}
+<span class="badge bg-success">
+Low
+</span>
+
+{% endif %}
+
+</td>
 <td>{{ alert.incident_class }}</td>
 </tr>
 {% endfor %}
