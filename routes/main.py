@@ -175,7 +175,7 @@ Analyze Threat
 
 <div class="alert alert-danger border border-danger">
 <h4 class="fw-bold text-danger">
-🚨 HIGH RISK INTRUSION DETECTED
+🚨 Attack Detected
 </h4>
 <p>Risk Score:
 <strong>{{ "%.3f"|format(risk_score) }}</strong></p>
@@ -198,7 +198,7 @@ Threat Level:
 {% else %}
 
 <div class="alert alert-success border border-success">
-<h4>✅ NORMAL ACTIVITY</h4>
+<h4>✅ Normal Activity</h4>
 <p>Risk Score:
 <strong>{{ "%.3f"|format(risk_score) }}</strong></p>
 <p>
