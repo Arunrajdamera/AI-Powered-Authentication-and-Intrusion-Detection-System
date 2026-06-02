@@ -33,41 +33,147 @@ def portal():
     users = User.query.order_by(User.created_at.desc()).all()
     return render_template_string(
         """
-        <h1>Security Administration</h1>
-        <p>Users: {{ totals.users }} | Login events: {{ totals.login_logs }} | Open alerts: {{ totals.open_alerts }} | Audit logs: {{ totals.audit_logs }}</p>
-        <form method="post" action="{{ url_for('auth.logout') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit">Logout</button>
-        </form>
-        <a href="{{ url_for('admin.export_login_logs') }}">Export Login Logs</a>
-        <a href="{{ url_for('admin.export_alerts') }}">Export Alerts</a>
-        <a href="{{ url_for('main.predict_ids') }}">IDS Prediction</a>
-        <h2>User List</h2>
-        <table>
-          <thead><tr><th>ID</th><th>Email</th><th>Role</th><th>Active</th><th>Locked</th><th>Failed Logins</th></tr></thead>
-          <tbody>
-          {% for user in users %}
-            <tr>
-              <td>{{ user.id }}</td>
-              <td>{{ user.email }}</td>
-              <td>{{ user.role.name }}</td>
-              <td>{{ user.is_active_flag }}</td>
-              <td>{{ user.is_locked }}</td>
-              <td>{{ user.failed_login_count }}</td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-        <h2>Security Alerts</h2>
-        <ul>
-        {% for alert in alerts %}
-          <li>{{ alert.id }} | {{ alert.severity }} | {{ alert.incident_class }} | resolved={{ alert.is_resolved }}
-          <form method="post" action="{{ url_for('admin.toggle_alert', alert_id=alert.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">Toggle Resolution</button>
-          </form></li>
-        {% endfor %}
-        </ul>
+        <!DOCTYPE html>
+<html>
+<head>
+
+<title>Security Dashboard</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+
+body{
+    background:#f5f7fb;
+}
+
+.stat-card{
+    border:none;
+    border-radius:15px;
+    box-shadow:0 4px 15px rgba(0,0,0,.08);
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container mt-4">
+
+<h2 class="mb-4">
+🛡 Security Administration Dashboard
+</h2>
+
+<div class="row mb-4">
+
+<div class="col-md-3">
+<div class="card stat-card p-3">
+<h6>Total Users</h6>
+<h3>{{ totals.users }}</h3>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card stat-card p-3">
+<h6>Login Events</h6>
+<h3>{{ totals.login_logs }}</h3>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card stat-card p-3">
+<h6>Open Alerts</h6>
+<h3>{{ totals.open_alerts }}</h3>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card stat-card p-3">
+<h6>Audit Logs</h6>
+<h3>{{ totals.audit_logs }}</h3>
+</div>
+</div>
+
+</div>
+
+<div class="mb-4">
+
+<form method="post" action="{{ url_for('auth.logout') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<button class="btn btn-danger">
+Logout
+</button>
+</form>
+
+</div>
+
+<div class="card p-3 mb-4">
+
+<h4>User Management</h4>
+
+<table class="table table-striped">
+
+<thead>
+<tr>
+<th>ID</th>
+<th>Email</th>
+<th>Role</th>
+<th>Failed Logins</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for user in users %}
+<tr>
+<td>{{ user.id }}</td>
+<td>{{ user.email }}</td>
+<td>{{ user.role.name }}</td>
+<td>{{ user.failed_login_count }}</td>
+</tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+<div class="card p-3">
+
+<h4>Security Alerts</h4>
+
+<table class="table">
+
+<thead>
+<tr>
+<th>ID</th>
+<th>Severity</th>
+<th>Incident</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for alert in alerts %}
+<tr>
+<td>{{ alert.id }}</td>
+<td>{{ alert.severity }}</td>
+<td>{{ alert.incident_class }}</td>
+</tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+</body>
+</html>
         """,
         totals=totals,
         alerts=alerts,
