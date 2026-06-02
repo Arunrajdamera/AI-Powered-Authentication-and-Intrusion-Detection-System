@@ -110,7 +110,8 @@ Logout
 
 <div class="card p-3 mb-4">
 
-<h4>User Management</h4>
+<h4>User List</h4>
+<p class="text-muted">User Management</p>
 
 <table class="table table-striped">
 
