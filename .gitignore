@@ -78,3 +78,21 @@ $RECYCLE.BIN/
 
 # Local generated structure reports
 structure.txt
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+
+# Local database
+database/*.db
+
+# Logs
+logs/*.log
+
+# Test cache
+.pytest_cache/

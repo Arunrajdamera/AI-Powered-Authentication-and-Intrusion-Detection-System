@@ -21,8 +21,10 @@ def seed_admin() -> None:
         admin_role = _get_or_create_role("admin", "Security administrator with full SIEM access")
         _get_or_create_role("analyst", "Standard user with personal telemetry access")
 
-        admin_email = os.getenv("ADMIN_EMAIL", "admin@example.com").strip().lower()
-        admin_password = os.getenv("ADMIN_PASSWORD", "AdminPass123!")
+        admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+        admin_password = os.getenv("ADMIN_PASSWORD", "")
+        if not admin_email or not admin_password:
+            raise RuntimeError("ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env")
         admin = User.query.filter_by(email=admin_email).first()
         if admin is None:
             admin = User(email=admin_email, role=admin_role)

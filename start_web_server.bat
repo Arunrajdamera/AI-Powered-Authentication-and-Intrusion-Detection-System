@@ -2,16 +2,7 @@
 setlocal
 cd /d "%~dp0"
 
-set "PYTHON_EXE=C:\Users\admin\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
-
-if not exist "%PYTHON_EXE%" (
-  echo Bundled Python was not found at:
-  echo %PYTHON_EXE%
-  echo.
-  echo Install Python or update PYTHON_EXE inside start_web_server.bat.
-  pause
-  exit /b 1
-)
+set "PYTHON_EXE=py"
 
 echo Initializing database and admin account...
 "%PYTHON_EXE%" scripts\seed_admin.py
