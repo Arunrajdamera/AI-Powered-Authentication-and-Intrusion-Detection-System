@@ -1,9 +1,18 @@
-from flask import Blueprint, current_app, redirect, render_template_string, request, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    redirect,
+    render_template_string,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 
+from app import db
 from ml.predict import IntrusionPredictor
 from models.alert import SecurityAlert
-from models.log import LoginLog
+from models.log import AuditLog, LoginLog
+from services.security_service import SecurityService
 
 
 main_bp = Blueprint("main", __name__)
@@ -21,21 +30,358 @@ def home():
 def dashboard():
     if current_user.is_admin():
         return redirect(url_for("admin.portal"))
-    logs = LoginLog.query.filter_by(user_id=current_user.id).order_by(LoginLog.created_at.desc()).limit(25).all()
-    alerts = SecurityAlert.query.filter_by(user_id=current_user.id).order_by(SecurityAlert.created_at.desc()).limit(10).all()
+
+    logs = (
+        LoginLog.query
+        .filter_by(user_id=current_user.id)
+        .order_by(LoginLog.created_at.desc())
+        .limit(25)
+        .all()
+    )
+
+    alerts = (
+        SecurityAlert.query
+        .filter_by(user_id=current_user.id)
+        .order_by(SecurityAlert.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
     return render_template_string(
         """
-        <h1>Personal Telemetry</h1>
-        <p>{{ current_user.email }}</p>
-        <form method="post" action="{{ url_for('auth.logout') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit">Logout</button>
-        </form>
-        <p><a href="{{ url_for('main.predict_ids') }}">IDS Prediction</a></p>
-        <h2>Recent Login Events</h2>
-        <ul>{% for log in logs %}<li>{{ log.created_at }} | success={{ log.success }} | risk={{ "%.2f"|format(log.risk_score) }}</li>{% endfor %}</ul>
-        <h2>Alerts</h2>
-        <ul>{% for alert in alerts %}<li>{{ alert.severity }} | {{ alert.incident_class }} | resolved={{ alert.is_resolved }}</li>{% endfor %}</ul>
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Personal Telemetry</title>
+
+            <link
+                href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+                rel="stylesheet"
+            >
+
+            <style>
+                body {
+                    background: #061014;
+                    color: #e6f7ff;
+                    font-family: Arial, sans-serif;
+                }
+
+                .container {
+                    max-width: 1100px;
+                }
+
+                .card {
+                    background: #0a181d;
+                    border: 1px solid #153942;
+                    border-radius: 14px;
+                    color: #e6f7ff;
+                }
+
+                .table {
+                    color: #dceff5;
+                }
+
+                .table th {
+                    color: #55c9e8;
+                }
+
+                .table td {
+                    border-color: #153942;
+                }
+
+                .btn-cyber {
+                    border: 1px solid #00d9ff;
+                    color: #00d9ff;
+                    background: transparent;
+                }
+
+                .btn-cyber:hover {
+                    background: #00d9ff;
+                    color: #001014;
+                }
+
+                .text-muted {
+                    color: #7195a3 !important;
+                }
+            </style>
+        </head>
+
+        <body>
+
+        <div class="container mt-5">
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <div class="text-uppercase"
+                         style="color:#00d9ff; letter-spacing:3px;">
+                        Security Monitoring
+                    </div>
+
+                    <h1 class="mt-2">
+                        Personal Telemetry
+                    </h1>
+
+                    <p class="text-muted">
+                        {{ current_user.email }}
+                    </p>
+                </div>
+
+                <div>
+                    <a
+                        href="{{ url_for('main.predict_ids') }}"
+                        class="btn btn-cyber me-2"
+                    >
+                        IDS ANALYSIS
+                    </a>
+
+                    <form
+                        method="post"
+                        action="{{ url_for('auth.logout') }}"
+                        class="d-inline"
+                    >
+                        <input
+                            type="hidden"
+                            name="csrf_token"
+                            value="{{ csrf_token() }}"
+                        >
+
+                        <button class="btn btn-outline-danger">
+                            LOGOUT
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+
+            <div class="card p-4 mb-4">
+
+                <h4>Recent Login Events</h4>
+
+                <div class="table-responsive mt-3">
+
+                    <table class="table">
+
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Time</th>
+                                <th>Result</th>
+                                <th>Risk</th>
+                                <th>Indicators</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                        {% for log in logs %}
+
+                            <tr>
+
+                                <td>#{{ log.id }}</td>
+
+                                <td>
+                                    {{ log.created_at }}
+                                </td>
+
+                                <td>
+
+                                    {% if log.success %}
+
+                                        <span
+                                            style="
+                                                color:#00e676;
+                                                font-weight:bold;
+                                            "
+                                        >
+                                            SUCCESS
+                                        </span>
+
+                                    {% else %}
+
+                                        <span
+                                            style="
+                                                color:#ff4d5a;
+                                                font-weight:bold;
+                                            "
+                                        >
+                                            FAILED
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+                                    {{ "%.3f"|format(log.risk_score) }}
+                                </td>
+
+                                <td>
+                                    {{ log.suspicious_indicators }}
+                                </td>
+
+                            </tr>
+
+                        {% else %}
+
+                            <tr>
+                                <td colspan="5" class="text-muted">
+                                    No login telemetry available.
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+
+            <div class="card p-4">
+
+                <div class="d-flex justify-content-between">
+
+                    <div>
+                        <h4>Security Alerts</h4>
+
+                        <p class="text-muted">
+                            Alerts associated with your account
+                        </p>
+                    </div>
+
+                    <span style="color:#00e676;">
+                        {{ alerts|length }} EVENTS
+                    </span>
+
+                </div>
+
+
+                <div class="table-responsive">
+
+                    <table class="table">
+
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Severity</th>
+                                <th>Incident</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                        {% for alert in alerts %}
+
+                            <tr>
+
+                                <td>#{{ alert.id }}</td>
+
+                                <td>
+
+                                    {% if alert.severity == "high" %}
+
+                                        <span
+                                            style="
+                                                color:#ff4d5a;
+                                                font-weight:bold;
+                                            "
+                                        >
+                                            HIGH
+                                        </span>
+
+                                    {% elif alert.severity == "medium" %}
+
+                                        <span
+                                            style="
+                                                color:#ffd21f;
+                                                font-weight:bold;
+                                            "
+                                        >
+                                            MEDIUM
+                                        </span>
+
+                                    {% else %}
+
+                                        <span
+                                            style="
+                                                color:#00e676;
+                                                font-weight:bold;
+                                            "
+                                        >
+                                            LOW
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+                                    {{ alert.incident_class }}
+                                </td>
+
+                                <td>
+
+                                    {% if alert.is_resolved %}
+
+                                        <span
+                                            style="
+                                                color:#00e676;
+                                                font-weight:bold;
+                                            "
+                                        >
+                                            RESOLVED
+                                        </span>
+
+                                    {% else %}
+
+                                        <span
+                                            style="
+                                                color:#ff4d5a;
+                                                font-weight:bold;
+                                            "
+                                        >
+                                            OPEN
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+                                    {{ alert.created_at }}
+                                </td>
+
+                            </tr>
+
+                        {% else %}
+
+                            <tr>
+                                <td colspan="5" class="text-muted">
+                                    No security alerts.
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        </body>
+        </html>
         """,
         logs=logs,
         alerts=alerts,
@@ -45,190 +391,917 @@ def dashboard():
 @main_bp.route("/ids/predict", methods=["GET", "POST"])
 @login_required
 def predict_ids():
+
     result = None
     risk_score = None
+    threat_level = None
+    indicators = []
+
     if request.method == "POST":
+
+        login_hour = float(
+            request.form.get("login_hour", "12")
+        )
+
+        preceding_fails = float(
+            request.form.get("preceding_fails", "0")
+        )
+
+        suspicious_ip = (
+            request.form.get("suspicious_ip") == "on"
+        )
+
+        country_mismatch = (
+            request.form.get("country_mismatch") == "on"
+        )
+
+        new_device = (
+            request.form.get("new_device") == "on"
+        )
+
         features = [
-            float(request.form.get("login_hour", "12")),
-            float(request.form.get("preceding_fails", "0")),
-            float(1 if request.form.get("suspicious_ip") == "on" else 0),
-            float(1 if request.form.get("country_mismatch") == "on" else 0),
-            float(1 if request.form.get("new_device") == "on" else 0),
+            login_hour,
+            preceding_fails,
+            float(1 if suspicious_ip else 0),
+            float(1 if country_mismatch else 0),
+            float(1 if new_device else 0),
         ]
-        predictor = IntrusionPredictor(current_app.config["MODEL_PATH"])
+
+        predictor = IntrusionPredictor(
+            current_app.config["MODEL_PATH"]
+        )
+
         risk_score = predictor.predict_risk(features)
-        result = "Attack" if risk_score >= 0.5 else "Normal"
+
+        result = (
+            "Attack"
+            if risk_score >= 0.5
+            else "Normal"
+        )
+
+        # --------------------------------------------------
+        # Build human-readable security indicators
+        # --------------------------------------------------
+
+        if suspicious_ip:
+            indicators.append("SUSPICIOUS_IP")
+
+        if country_mismatch:
+            indicators.append("COUNTRY_MISMATCH")
+
+        if new_device:
+            indicators.append("NEW_DEVICE")
+
+        if preceding_fails > 0:
+            indicators.append(
+                f"PRECEDING_FAILURES:{int(preceding_fails)}"
+            )
+
+        if login_hour < 6 or login_hour >= 23:
+            indicators.append("UNUSUAL_LOGIN_HOUR")
+
+        indicator_text = (
+            ";".join(indicators)
+            if indicators
+            else "none"
+        )
+
+        # --------------------------------------------------
+        # Determine threat level
+        # --------------------------------------------------
+
+        if risk_score >= 0.8:
+            threat_level = "Critical"
+
+        elif risk_score >= 0.5:
+            threat_level = "Medium"
+
+        else:
+            threat_level = "Low"
+
+        # --------------------------------------------------
+        # Record IDS prediction in audit trail
+        # --------------------------------------------------
+
+        SecurityService.audit(
+            current_user.id,
+            "IDS_PREDICTION",
+            "IDS_ANALYSIS",
+            "MANUAL",
+            (
+                f"Prediction={result}; "
+                f"risk_score={risk_score:.4f}; "
+                f"threat_level={threat_level}; "
+                f"indicators={indicator_text}."
+            ),
+        )
+
+        # --------------------------------------------------
+        # Create a real security alert for detected attacks
+        # --------------------------------------------------
+
+        if result == "Attack":
+
+            if risk_score >= 0.8:
+                severity = "high"
+            else:
+                severity = "medium"
+
+            SecurityService.create_alert(
+                user_id=current_user.id,
+                login_log_id=None,
+                incident_class="IDS_MODEL_DETECTION",
+                severity=severity,
+                description=(
+                    "IDS model detected potentially malicious "
+                    f"authentication activity. "
+                    f"Risk score: {risk_score:.4f}. "
+                    f"Threat level: {threat_level}. "
+                    f"Indicators: {indicator_text}."
+                ),
+            )
+
+        db.session.commit()
 
     return render_template_string(
         """
 <!DOCTYPE html>
 
-<html>
+<html lang="en">
+
 <head>
 
-<title>IDS Threat Analysis</title>
+    <meta charset="UTF-8">
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<style>
-body{
-    background:#f4f7fc;
-}
+    <title>IDS Threat Analysis</title>
 
-.card-custom{
-    border:none;
-    border-radius:15px;
-    box-shadow:0 4px 15px rgba(0,0,0,.08);
-}
-</style>
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #050f13;
+            color: #e8f8ff;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .page {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 45px 24px 70px;
+        }
+
+        .eyebrow {
+            color: #00d9ff;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #6d9bab;
+            margin-bottom: 28px;
+        }
+
+        .panel {
+            background: #09181d;
+            border: 1px solid #173a44;
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .panel-header {
+            padding: 20px;
+            border-bottom: 1px solid #173a44;
+        }
+
+        .panel-header h3 {
+            margin: 0;
+            font-size: 16px;
+            letter-spacing: .5px;
+        }
+
+        .panel-header p {
+            margin: 6px 0 0;
+            color: #7197a6;
+            font-size: 13px;
+        }
+
+        .panel-body {
+            padding: 24px;
+        }
+
+        .telemetry {
+            background: #030a0d;
+            border: 1px solid #112d35;
+            padding: 18px;
+            margin-bottom: 24px;
+            font-family: Consolas, monospace;
+            font-size: 13px;
+            line-height: 2;
+            color: #00e676;
+        }
+
+        .form-label {
+            color: #75aabd;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-control {
+            background: #07151a;
+            border: 1px solid #1c4652;
+            color: #e8f8ff;
+            min-height: 44px;
+        }
+
+        .form-control:focus {
+            background: #07151a;
+            color: #ffffff;
+            border-color: #00d9ff;
+            box-shadow: 0 0 0 2px rgba(0,217,255,.12);
+        }
+
+        .indicator-box {
+            background: #07151a;
+            border: 1px solid #173a44;
+            border-radius: 8px;
+            padding: 15px;
+            height: 100%;
+        }
+
+        .form-check-input {
+            background-color: #07151a;
+            border-color: #2b5661;
+        }
+
+        .form-check-input:checked {
+            background-color: #00a9d4;
+            border-color: #00a9d4;
+        }
+
+        .form-check-label {
+            color: #dceff5;
+        }
+
+        .btn-analyze {
+            background: transparent;
+            border: 1px solid #00d9ff;
+            color: #00d9ff;
+            padding: 12px 22px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .btn-analyze:hover {
+            background: #00d9ff;
+            color: #001014;
+        }
+
+        .btn-back {
+            display: inline-block;
+            color: #00d9ff;
+            border: 1px solid #174a58;
+            padding: 9px 15px;
+            text-decoration: none;
+            border-radius: 7px;
+            margin-bottom: 24px;
+        }
+
+        .btn-back:hover {
+            color: #ffffff;
+            border-color: #00d9ff;
+        }
+
+        .result-panel {
+            border-color: #244650;
+        }
+
+        .result-body {
+            padding: 28px;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .result-label {
+            color: #70a6b8;
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .attack-text {
+            color: #ff4754;
+            font-size: 29px;
+            font-weight: 800;
+            margin-top: 8px;
+        }
+
+        .normal-text {
+            color: #00e676;
+            font-size: 29px;
+            font-weight: 800;
+            margin-top: 8px;
+        }
+
+        .risk-number {
+            color: #00d9ff;
+            font-size: 34px;
+            font-weight: 800;
+            text-align: right;
+        }
+
+        .risk-bar {
+            height: 8px;
+            background: #122b32;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 24px 0;
+        }
+
+        .risk-fill {
+            height: 100%;
+            border-radius: 10px;
+        }
+
+        .risk-danger {
+            background: #ff4754;
+        }
+
+        .risk-warning {
+            background: #ffd21f;
+        }
+
+        .risk-safe {
+            background: #00e676;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .detail-card {
+            background: #07151a;
+            border: 1px solid #173a44;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .detail-title {
+            color: #5f9aad;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .detail-value {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .detected {
+            color: #ff4754;
+        }
+
+        .clear {
+            color: #00e676;
+        }
+
+        .response-box {
+            margin-top: 20px;
+            padding: 17px;
+            background: #061116;
+            border-left: 3px solid #00d9ff;
+            color: #b9d9e3;
+            line-height: 1.7;
+            font-size: 13px;
+        }
+
+        @media (max-width: 768px) {
+
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .risk-number {
+                text-align: left;
+            }
+
+            .detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .title {
+                font-size: 27px;
+            }
+
+        }
+
+    </style>
 
 </head>
 
+
 <body>
 
-<div class="container mt-4">
+<div class="page">
 
-<h2 class="mb-4">
-🛡 IDS Threat Analysis Dashboard
-</h2>
+    <div class="eyebrow">
+        Intrusion Detection System
+    </div>
 
-<a href="{{ url_for('main.dashboard') }}"
-class="btn btn-secondary mb-4">
-Dashboard </a>
+    <div class="title">
+        IDS Threat Analysis
+    </div>
 
-<div class="card card-custom p-4 mb-4">
+    <div class="subtitle">
+        Analyze authentication telemetry using the trained intrusion detection model.
+    </div>
 
-<form method="post">
 
-<input type="hidden"
-    name="csrf_token"
-    value="{{ csrf_token() }}">
+    <a
+        href="{{ url_for('main.dashboard') }}"
+        class="btn-back"
+    >
+        ← BACK TO DASHBOARD
+    </a>
 
-<div class="row">
 
-<div class="col-md-6 mb-3">
-<label class="form-label">Login Hour</label>
-<input class="form-control"
-       name="login_hour"
-       type="number"
-       min="0"
-       max="23"
-       value="12"
-       required>
-</div>
+    <div class="panel">
 
-<div class="col-md-6 mb-3">
-<label class="form-label">Previous Failed Attempts</label>
-<input class="form-control"
-       name="preceding_fails"
-       type="number"
-       min="0"
-       max="20"
-       value="0"
-       required>
-</div>
+        <div class="panel-header">
 
-</div>
+            <h3>
+                THREAT ANALYSIS ENGINE
+            </h3>
 
-<div class="form-check">
-<input class="form-check-input"
-       name="suspicious_ip"
-       type="checkbox">
-<label class="form-check-label">
-Suspicious IP
-</label>
-</div>
+            <p>
+                Configure authentication indicators
+            </p>
 
-<div class="form-check">
-<input class="form-check-input"
-       name="country_mismatch"
-       type="checkbox">
-<label class="form-check-label">
-Country Mismatch
-</label>
-</div>
+        </div>
 
-<div class="form-check mb-3">
-<input class="form-check-input"
-       name="new_device"
-       type="checkbox">
-<label class="form-check-label">
-New Device
-</label>
-</div>
 
-<button class="btn btn-primary">
-Analyze Threat
-</button>
+        <div class="panel-body">
 
-</form>
+            <div class="telemetry">
 
-</div>
+                [OK] IDS prediction engine loaded<br>
+                [OK] Machine learning model available<br>
+                [OK] Authentication feature pipeline ready
 
-{% if result %}
+            </div>
 
-<div class="card card-custom p-4">
 
-<h3>Threat Analysis Result</h3>
+            <form method="post">
 
-{% if result == "Attack" %}
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token() }}"
+                >
 
-<div class="alert alert-danger border border-danger">
-<h4 class="fw-bold text-danger">
-🚨 Attack Detected
-</h4>
-<p>Risk Score:
-<strong>{{ "%.3f"|format(risk_score) }}</strong></p>
-<p>
-Threat Level:
 
-{% if risk_score >= 0.8 %}
-<span class="badge bg-danger">Critical</span>
+                <div class="row">
 
-{% elif risk_score >= 0.5 %}
-<span class="badge bg-warning text-dark">Medium Risk</span>
+                    <div class="col-md-6 mb-4">
 
-{% else %}
-<span class="badge bg-success">Low Risk</span>
+                        <label class="form-label">
+                            Login Hour
+                        </label>
 
-{% endif %}
-</p>
-</div>
+                        <input
+                            class="form-control"
+                            name="login_hour"
+                            type="number"
+                            min="0"
+                            max="23"
+                            value="12"
+                            required
+                        >
 
-{% else %}
+                    </div>
 
-<div class="alert alert-success border border-success">
-<h4>✅ Normal Activity</h4>
-<p>Risk Score:
-<strong>{{ "%.3f"|format(risk_score) }}</strong></p>
-<p>
-Threat Level:
 
-{% if risk_score >= 0.8 %}
-<span class="badge bg-danger">Critical</span>
+                    <div class="col-md-6 mb-4">
 
-{% elif risk_score >= 0.5 %}
-<span class="badge bg-warning text-dark">Medium Risk</span>
+                        <label class="form-label">
+                            Previous Failed Attempts
+                        </label>
 
-{% else %}
-<span class="badge bg-success">Low Risk</span>
+                        <input
+                            class="form-control"
+                            name="preceding_fails"
+                            type="number"
+                            min="0"
+                            max="20"
+                            value="0"
+                            required
+                        >
 
-{% endif %}
-</p>
-</div>
+                    </div>
 
-{% endif %}
+                </div>
 
-</div>
 
-{% endif %}
+                <div class="row mb-4">
+
+                    <div class="col-md-4 mb-3">
+
+                        <div class="indicator-box">
+
+                            <div class="form-check">
+
+                                <input
+                                    class="form-check-input"
+                                    name="suspicious_ip"
+                                    type="checkbox"
+                                    id="suspicious_ip"
+                                >
+
+                                <label
+                                    class="form-check-label"
+                                    for="suspicious_ip"
+                                >
+                                    Suspicious IP
+                                </label>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="col-md-4 mb-3">
+
+                        <div class="indicator-box">
+
+                            <div class="form-check">
+
+                                <input
+                                    class="form-check-input"
+                                    name="country_mismatch"
+                                    type="checkbox"
+                                    id="country_mismatch"
+                                >
+
+                                <label
+                                    class="form-check-label"
+                                    for="country_mismatch"
+                                >
+                                    Country Mismatch
+                                </label>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="col-md-4 mb-3">
+
+                        <div class="indicator-box">
+
+                            <div class="form-check">
+
+                                <input
+                                    class="form-check-input"
+                                    name="new_device"
+                                    type="checkbox"
+                                    id="new_device"
+                                >
+
+                                <label
+                                    class="form-check-label"
+                                    for="new_device"
+                                >
+                                    New Device
+                                </label>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <button
+                    type="submit"
+                    class="btn btn-analyze"
+                >
+                    ANALYZE THREAT
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+    {% if result %}
+
+    <div class="panel result-panel">
+
+        <div class="panel-header">
+
+            <h3>
+                ANALYSIS RESULT
+            </h3>
+
+        </div>
+
+
+        <div class="result-body">
+
+            <div class="result-grid">
+
+                <div>
+
+                    <div class="result-label">
+                        Detection Status
+                    </div>
+
+
+                    {% if result == "Attack" %}
+
+                        <div class="attack-text">
+                            ⚠ ATTACK DETECTED
+                        </div>
+
+                    {% else %}
+
+                        <div class="normal-text">
+                            ✓ NORMAL ACTIVITY
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+
+                <div>
+
+                    <div class="result-label">
+                        Risk Score
+                    </div>
+
+                    <div class="risk-number">
+                        {{ "%.3f"|format(risk_score) }}
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            {% if risk_score >= 0.8 %}
+
+                <div class="risk-bar">
+                    <div
+                        class="risk-fill risk-danger"
+                        style="width: {{ (risk_score * 100)|round(1) }}%;"
+                    ></div>
+                </div>
+
+            {% elif risk_score >= 0.5 %}
+
+                <div class="risk-bar">
+                    <div
+                        class="risk-fill risk-warning"
+                        style="width: {{ (risk_score * 100)|round(1) }}%;"
+                    ></div>
+                </div>
+
+            {% else %}
+
+                <div class="risk-bar">
+                    <div
+                        class="risk-fill risk-safe"
+                        style="width: {{ (risk_score * 100)|round(1) }}%;"
+                    ></div>
+                </div>
+
+            {% endif %}
+
+
+            <div class="detail-grid">
+
+                <div class="detail-card">
+
+                    <div class="detail-title">
+                        Login Hour
+                    </div>
+
+                    <div class="detail-value">
+                        {{ request.form.get("login_hour", "12") }}:00
+                    </div>
+
+                </div>
+
+
+                <div class="detail-card">
+
+                    <div class="detail-title">
+                        Failed Attempts
+                    </div>
+
+                    <div class="detail-value">
+                        {{ request.form.get("preceding_fails", "0") }}
+                    </div>
+
+                </div>
+
+
+                <div class="detail-card">
+
+                    <div class="detail-title">
+                        Suspicious IP
+                    </div>
+
+                    {% if request.form.get("suspicious_ip") == "on" %}
+
+                        <div class="detail-value detected">
+                            DETECTED
+                        </div>
+
+                    {% else %}
+
+                        <div class="detail-value clear">
+                            CLEAR
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+
+                <div class="detail-card">
+
+                    <div class="detail-title">
+                        Country Mismatch
+                    </div>
+
+                    {% if request.form.get("country_mismatch") == "on" %}
+
+                        <div class="detail-value detected">
+                            DETECTED
+                        </div>
+
+                    {% else %}
+
+                        <div class="detail-value clear">
+                            CLEAR
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+
+                <div class="detail-card">
+
+                    <div class="detail-title">
+                        New Device
+                    </div>
+
+                    {% if request.form.get("new_device") == "on" %}
+
+                        <div class="detail-value detected">
+                            DETECTED
+                        </div>
+
+                    {% else %}
+
+                        <div class="detail-value clear">
+                            CLEAR
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+
+                <div class="detail-card">
+
+                    <div class="detail-title">
+                        Threat Level
+                    </div>
+
+                    <div class="detail-value">
+
+                        {% if threat_level == "Critical" %}
+
+                            <span class="detected">
+                                CRITICAL
+                            </span>
+
+                        {% elif threat_level == "Medium" %}
+
+                            <span style="color:#ffd21f;">
+                                MEDIUM
+                            </span>
+
+                        {% else %}
+
+                            <span class="clear">
+                                LOW
+                            </span>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            {% if result == "Attack" %}
+
+                <div class="response-box">
+
+                    <strong style="color:#00d9ff;">
+                        Security Response:
+                    </strong>
+
+                    The authentication activity has been classified
+                    as potentially malicious by the IDS model.
+
+                    The prediction has been recorded in the security
+                    audit trail and an IDS security alert has been
+                    created for administrator investigation.
+
+                </div>
+
+            {% else %}
+
+                <div class="response-box">
+
+                    <strong style="color:#00e676;">
+                        Security Response:
+                    </strong>
+
+                    No malicious activity was detected by the IDS model.
+                    The prediction has been recorded in the security
+                    audit trail.
+
+                </div>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
 
 </div>
 
 </body>
-</html>
 
-                """,
+</html>
+        """,
         result=result,
         risk_score=risk_score,
+        threat_level=threat_level,
+        indicators=indicators,
     )
