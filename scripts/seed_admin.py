@@ -62,22 +62,22 @@ def seed_admin() -> None:
             )
 
         else:
-    admin.role = admin_role
-    admin.is_active_flag = True
-    admin.is_locked = False
-    admin.locked_until = None
-    admin.failed_login_count = 0
+            admin.role = admin_role
+            admin.is_active_flag = True
+            admin.is_locked = False
+            admin.locked_until = None
+            admin.failed_login_count = 0
 
-    # Reset admin password from ADMIN_PASSWORD
-    admin.set_password(admin_password)
+            # Reset admin password from ADMIN_PASSWORD
+            admin.set_password(admin_password)
 
-    SecurityService.audit(
-        None,
-        "SEED_ADMIN_REFRESH",
-        "User",
-        str(admin.id),
-        f"Updated bootstrap admin {admin_email}."
-    )
+            SecurityService.audit(
+                None,
+                "SEED_ADMIN_REFRESH",
+                "User",
+                str(admin.id),
+                f"Updated bootstrap admin {admin_email}."
+            )
 
         db.session.commit()
 
