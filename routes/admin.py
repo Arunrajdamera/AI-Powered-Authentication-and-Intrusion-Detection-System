@@ -796,7 +796,7 @@ def portal():
         <div class="action-bar mb-0">
 
             <a
-                href="{{ url_for('main.predict_ids') }}"
+                href="{{ url_for('main.threat_analysis') }}"
                 class="soc-btn btn-ids"
             >
                 IDS ANALYSIS

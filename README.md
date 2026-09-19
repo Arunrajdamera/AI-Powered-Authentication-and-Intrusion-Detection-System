@@ -339,3 +339,28 @@ Academic submission materials are available in the `docs/` folder:
 ## Conclusion
 
 This project demonstrates a complete authentication-focused SIEM system with secure Flask authentication, structured logging, account lockout, security alerts, CSV reporting, and Random Forest based IDS classification. It is suitable for academic submission, GitHub portfolio presentation, and further cybersecurity research extension.
+
+## SOC telemetry upgrade
+
+The primary IDS workflow is now `/ids/predict`, which displays automatically collected authentication events rather than requiring an analyst to enter attack values. Each login produces a `LoginLog`, then the application derives the five existing ML features (UTC hour, prior failures, IP signal, country mismatch, and device signal), persists the ML result, deterministic indicators, derived risk score, and analyst severity in a `SecurityEvent`. ML classification is deliberately displayed separately from rule correlation and the final severity (`NORMAL`, `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`). Alerts are created for medium-or-higher correlated risk.
+
+The Threat Analysis page includes safe local demonstration controls for a failed-login burst, new device, and off-hours event. They produce real records through the same pipeline and never target an external system.
+
+### Password recovery
+
+`/forgot-password` returns the same generic response for every address. Reset tokens are 256-bit URL-safe values, stored only as SHA-256 hashes, expire after about 30 minutes, become invalid when another reset is requested, and become single-use after a successful password change. Links are sent only via configured SMTP and are never shown in the UI.
+
+Configure these private `.env` values for email delivery:
+
+```text
+MAIL_SERVER=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=your-smtp-username
+MAIL_PASSWORD=your-smtp-password
+MAIL_USE_TLS=true
+MAIL_DEFAULT_SENDER=no-reply@example.com
+APP_BASE_URL=http://127.0.0.1:5000
+PASSWORD_RESET_MINUTES=30
+```
+
+If SMTP is unavailable the request remains non-disclosing; the app logs the delivery failure and does not reveal a recovery URL. Set `SESSION_COOKIE_SECURE=true` for HTTPS deployments. This remains an academic PoC: SQLite, local rate limiting, request-supplied country metadata, and synthetic ML training data are not enterprise SIEM controls.

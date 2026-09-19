@@ -1,9 +1,13 @@
 import ipaddress
 import re
 import smtplib
+import hashlib
+import secrets
+import ssl
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+from urllib.parse import urljoin, urlparse
 
 from flask import (
     Blueprint,
@@ -22,15 +26,9 @@ from flask_login import (
     logout_user,
 )
 
-from itsdangerous import (
-    BadSignature,
-    SignatureExpired,
-    URLSafeTimedSerializer,
-)
-
 from app import db, limiter
 from ml.predict import IntrusionPredictor
-from models.log import LoginLog
+from models.log import LoginLog, PasswordResetToken
 from models.user import Role, User
 from services.security_service import SecurityService
 
@@ -40,6 +38,16 @@ from services.security_service import SecurityService
 # ============================================================
 
 auth_bp = Blueprint("auth", __name__)
+
+
+# Internal delivery states are intentionally safe to log: they contain no
+# reset token, URL, SMTP password, or recipient address.
+EMAIL_SENT = "EMAIL_SENT"
+SMTP_CONNECTION_FAILED = "SMTP_CONNECTION_FAILED"
+SMTP_AUTH_FAILED = "SMTP_AUTH_FAILED"
+SMTP_RECIPIENT_REJECTED = "SMTP_RECIPIENT_REJECTED"
+SMTP_SEND_FAILED = "SMTP_SEND_FAILED"
+MAIL_CONFIGURATION_MISSING = "MAIL_CONFIGURATION_MISSING"
 
 
 # ============================================================
@@ -56,9 +64,6 @@ EMAIL_RE = re.compile(
 
 
 # Password reset token lifetime
-PASSWORD_RESET_MAX_AGE = 1800  # 30 minutes
-
-
 # ============================================================
 # SHARED SOC AUTHENTICATION STYLE
 # ============================================================
@@ -1194,23 +1199,6 @@ FORGOT_PASSWORD_TEMPLATE = """
             </form>
 
 
-            {% if reset_link %}
-
-                <div class="reset-link-box">
-
-                    <div class="reset-link-title">
-                        Development Recovery Link
-                    </div>
-
-                    <a href="{{ reset_link }}">
-                        {{ reset_link }}
-                    </a>
-
-                </div>
-
-            {% endif %}
-
-
             <div class="divider"></div>
 
 
@@ -1465,6 +1453,7 @@ def register():
         # ----------------------------------------------------
 
         if not _valid_email(email):
+            current_app.logger.info("Password reset request processed: invalid email format; SMTP not attempted.")
 
             flash(
                 "A valid email address is required."
@@ -1698,6 +1687,14 @@ def login():
 
         db.session.flush()
 
+        security_event = SecurityService.analyze_authentication(
+            login_log_id=login_log.id,
+            user_id=user.id if user else None,
+            success=success,
+            ml_risk_score=risk_score,
+            indicators=indicators,
+        )
+
         # ----------------------------------------------------
         # Successful authentication
         # ----------------------------------------------------
@@ -1773,8 +1770,6 @@ def forgot_password():
             url_for("main.dashboard")
         )
 
-    reset_link = None
-
     if request.method == "POST":
 
         email = request.form.get(
@@ -1788,7 +1783,7 @@ def forgot_password():
 
         generic_message = (
             "If an account exists for that email, "
-            "a password recovery link has been generated."
+            "a password-reset link has been sent."
         )
 
         # ----------------------------------------------------
@@ -1802,7 +1797,6 @@ def forgot_password():
             return render_template_string(
                 FORGOT_PASSWORD_TEMPLATE,
                 style=AUTH_STYLE,
-                reset_link=None,
             )
 
         # ----------------------------------------------------
@@ -1823,11 +1817,7 @@ def forgot_password():
                 user
             )
 
-            reset_link = url_for(
-                "auth.reset_password",
-                token=token,
-                _external=True,
-            )
+            reset_link = _build_reset_url(token)
 
             # ------------------------------------------------
             # Audit reset request
@@ -1847,28 +1837,23 @@ def forgot_password():
             # Attempt email delivery
             # ------------------------------------------------
 
-            email_sent = _send_password_reset_email(
-                user,
-                reset_link,
-            )
-
-            # ------------------------------------------------
-            # In production, don't expose the link.
-            #
-            # During local development/demo, showing it is
-            # useful when SMTP is not configured.
-            # ------------------------------------------------
-
-            if email_sent:
-
-                reset_link = None
+            if reset_link is not None:
+                _send_password_reset_email(user, reset_link)
+            else:
+                current_app.logger.warning(
+                    "Password reset mail status=%s reason=APP_BASE_URL_INVALID_OR_MISSING",
+                    MAIL_CONFIGURATION_MISSING,
+                )
+        else:
+            # Preserve the indistinguishable browser response while making the
+            # deliberate no-send branch visible to a local operator.
+            current_app.logger.info("Password reset request processed: no matching account; SMTP not attempted.")
 
         flash(generic_message)
 
     return render_template_string(
         FORGOT_PASSWORD_TEMPLATE,
         style=AUTH_STYLE,
-        reset_link=reset_link,
     )
 
 
@@ -1967,6 +1952,11 @@ def reset_password(token):
         # ----------------------------------------------------
 
         user.set_password(password)
+        reset_record = _load_reset_record(token)
+        if reset_record is None:
+            flash("This password reset link is invalid or has expired.")
+            return redirect(url_for("auth.forgot_password"))
+        reset_record.used_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # ----------------------------------------------------
         # Reset failed-login state if the model provides it
@@ -2041,91 +2031,51 @@ def logout():
 # PASSWORD RESET TOKEN GENERATION
 # ============================================================
 
-def _reset_serializer():
-
-    return URLSafeTimedSerializer(
-        current_app.config["SECRET_KEY"]
-    )
-
-
 def _generate_reset_token(
     user: User,
 ) -> str:
-
-    serializer = _reset_serializer()
-
-    return serializer.dumps(
-        {
-            "user_id": user.id,
-            "password_hash": user.password_hash,
-        },
-        salt="password-reset",
+    raw_token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    PasswordResetToken.query.filter_by(user_id=user.id, used_at=None).update(
+        {PasswordResetToken.used_at: now}, synchronize_session=False
     )
+    db.session.add(PasswordResetToken(
+        user_id=user.id,
+        token_hash=_hash_reset_token(raw_token),
+        expires_at=now + timedelta(minutes=current_app.config["PASSWORD_RESET_MINUTES"]),
+    ))
+    return raw_token
 
 
 def _load_user_from_reset_token(
     token: str,
 ):
+    record = _load_reset_record(token)
+    return record.user if record and record.user.is_active else None
 
-    serializer = _reset_serializer()
 
-    try:
-
-        data = serializer.loads(
-            token,
-            salt="password-reset",
-            max_age=PASSWORD_RESET_MAX_AGE,
-        )
-
-    except SignatureExpired:
-
+def _load_reset_record(token: str) -> PasswordResetToken | None:
+    if not token or len(token) > 256:
         return None
-
-    except BadSignature:
-
+    record = PasswordResetToken.query.filter_by(token_hash=_hash_reset_token(token)).first()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if record is None or record.used_at is not None or record.expires_at <= now:
         return None
+    return record
 
-    except Exception:
 
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _build_reset_url(token: str) -> str | None:
+    """Build the reset path with Flask routing and a configured public origin."""
+    base_url = current_app.config.get("APP_BASE_URL", "").strip()
+    parsed = urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return None
-
-    user_id = data.get(
-        "user_id"
-    )
-
-    token_password_hash = data.get(
-        "password_hash"
-    )
-
-    if not user_id or not token_password_hash:
-
-        return None
-
-    user = db.session.get(
-        User,
-        user_id,
-    )
-
-    if user is None:
-
-        return None
-
-    # --------------------------------------------------------
-    # The token is tied to the password hash.
-    #
-    # Once the password changes, the old token automatically
-    # becomes invalid.
-    # --------------------------------------------------------
-
-    if user.password_hash != token_password_hash:
-
-        return None
-
-    if not user.is_active:
-
-        return None
-
-    return user
+    reset_path = url_for("auth.reset_password", token=token, _external=False)
+    return urljoin(f"{base_url.rstrip('/')}/", reset_path.lstrip("/"))
 
 
 # ============================================================
@@ -2135,31 +2085,27 @@ def _load_user_from_reset_token(
 def _send_password_reset_email(
     user: User,
     reset_link: str,
-) -> bool:
+) -> str:
 
-    smtp_host = current_app.config.get(
-        "SMTP_HOST"
-    )
+    smtp_host = current_app.config.get("MAIL_SERVER")
 
     smtp_port = current_app.config.get(
-        "SMTP_PORT",
+        "MAIL_PORT",
         587,
     )
 
     smtp_username = current_app.config.get(
-        "SMTP_USERNAME"
+        "MAIL_USERNAME"
     )
 
     smtp_password = current_app.config.get(
-        "SMTP_PASSWORD"
+        "MAIL_PASSWORD"
     )
 
-    smtp_sender = current_app.config.get(
-        "SMTP_SENDER"
-    )
+    smtp_sender = current_app.config.get("MAIL_DEFAULT_SENDER") or smtp_username
 
     smtp_use_tls = current_app.config.get(
-        "SMTP_USE_TLS",
+        "MAIL_USE_TLS",
         True,
     )
 
@@ -2167,31 +2113,28 @@ def _send_password_reset_email(
     # SMTP not configured
     # --------------------------------------------------------
 
-    if not all(
-        [
-            smtp_host,
-            smtp_username,
-            smtp_password,
-            smtp_sender,
-        ]
-    ):
+    recipient_domain = user.email.rsplit("@", 1)[-1].lower() if "@" in user.email else "invalid"
 
-        return False
-
-    try:
-
-        message = EmailMessage()
-
-        message["Subject"] = (
-            "SOC Command Center - Password Reset"
+    def log_status(status: str, level: str = "info") -> str:
+        getattr(current_app.logger, level)(
+            "Password reset mail status=%s host=%s port=%s sender=%s recipient_domain=%s tls=%s",
+            status, smtp_host, smtp_port, smtp_sender, recipient_domain, bool(smtp_use_tls),
         )
+        return status
 
-        message["From"] = smtp_sender
+    if not all([smtp_host, smtp_username, smtp_password, smtp_sender]):
+        return log_status(MAIL_CONFIGURATION_MISSING, "warning")
 
-        message["To"] = user.email
+    message = EmailMessage()
 
-        message.set_content(
-            f"""
+    message["Subject"] = "SOC Command Center - Password Reset"
+
+    message["From"] = smtp_sender
+
+    message["To"] = user.email
+
+    message.set_content(
+        f"""
 Security Operations Center
 
 A password reset was requested for your analyst account.
@@ -2200,43 +2143,47 @@ Use the following link to create a new password:
 
 {reset_link}
 
-This link expires in 30 minutes.
+This link expires in {current_app.config['PASSWORD_RESET_MINUTES']} minutes.
 
 If you did not request this password reset,
 you can safely ignore this email.
 
 AI-Powered Authentication & Intrusion Detection System
 """.strip()
-        )
-
+    )
+    try:
         with smtplib.SMTP(
             smtp_host,
             smtp_port,
             timeout=10,
         ) as server:
-
+            server.ehlo()
             if smtp_use_tls:
-
-                server.starttls()
-
-            server.login(
-                smtp_username,
-                smtp_password,
+                server.starttls(context=ssl.create_default_context())
+                server.ehlo()
+            current_app.logger.info(
+                "Password reset mail SMTP connection established host=%s port=%s tls=%s",
+                smtp_host, smtp_port, bool(smtp_use_tls),
             )
-
-            server.send_message(
-                message
-            )
-
-        return True
-
-    except Exception:
-
-        current_app.logger.exception(
-            "Password reset email delivery failed."
-        )
-
-        return False
+            try:
+                server.login(smtp_username, smtp_password)
+            except smtplib.SMTPAuthenticationError:
+                if current_app.debug:
+                    current_app.logger.exception("Password reset mail SMTP authentication failure.")
+                return log_status(SMTP_AUTH_FAILED, "warning")
+            try:
+                server.send_message(message)
+            except smtplib.SMTPRecipientsRefused:
+                return log_status(SMTP_RECIPIENT_REJECTED, "warning")
+            except (ValueError, smtplib.SMTPException):
+                return log_status(SMTP_SEND_FAILED, "warning")
+        return log_status(EMAIL_SENT)
+    except (OSError, smtplib.SMTPConnectError):
+        return log_status(SMTP_CONNECTION_FAILED, "warning")
+    except (ValueError, smtplib.SMTPException):
+        if current_app.debug:
+            current_app.logger.exception("Password reset mail SMTP failure (safe traceback; message body omitted).")
+        return log_status(SMTP_SEND_FAILED, "warning")
 
 
 # ============================================================
@@ -2346,15 +2293,25 @@ def _build_auth_features(
             f"preceding_failures:{preceding_fails}"
         )
 
+    # Repeated authentication behavior is derived from prior telemetry rather
+    # than supplied by a form. It is an explainability indicator; the existing
+    # trained model still receives only its documented five features.
+    recent_attempts = LoginLog.query.filter(
+        LoginLog.email == (user.email if user else request.form.get("email", "").strip().lower()),
+        LoginLog.created_at >= (now - timedelta(minutes=5)).replace(tzinfo=None),
+    ).count()
+    if recent_attempts >= 4:
+        indicators.append(f"authentication_burst:{recent_attempts}")
+
     # --------------------------------------------------------
     # Device recognition
     # --------------------------------------------------------
 
-    new_device = (
-        1
-        if "X-Known-Device" not in request.headers
-        else 0
-    )
+    user_agent = request.headers.get("User-Agent", "")[:512]
+    known_device = bool(user and LoginLog.query.filter_by(
+        user_id=user.id, user_agent=user_agent, success=True
+    ).first())
+    new_device = 1 if "X-Known-Device" not in request.headers and not known_device else 0
 
     if new_device:
 

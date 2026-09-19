@@ -64,6 +64,11 @@ def _configure_logging(app: Flask) -> None:
         app.logger.removeHandler(existing_handler)
         existing_handler.close()
     app.logger.addHandler(handler)
+    if app.config.get("LOG_TO_CONSOLE", True):
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(handler.formatter)
+        app.logger.addHandler(console_handler)
     app.logger.setLevel(logging.INFO)
 
 

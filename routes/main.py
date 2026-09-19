@@ -1,16 +1,18 @@
+from datetime import datetime, timezone
+
 from flask import (
     Blueprint,
     current_app,
     redirect,
     render_template_string,
-    request,
+    request, flash,
     url_for,
 )
 from flask_login import current_user, login_required
 
 from app import db
 from ml.predict import IntrusionPredictor
-from models.alert import SecurityAlert
+from models.alert import SecurityAlert, SecurityEvent
 from models.log import AuditLog, LoginLog
 from services.security_service import SecurityService
 
@@ -130,7 +132,7 @@ def dashboard():
 
                 <div>
                     <a
-                        href="{{ url_for('main.predict_ids') }}"
+                        href="{{ url_for('main.threat_analysis') }}"
                         class="btn btn-cyber me-2"
                     >
                         IDS ANALYSIS
@@ -388,7 +390,38 @@ def dashboard():
     )
 
 
+THREAT_ANALYSIS_TEMPLATE = """<!doctype html><title>SOC Threat Analysis</title><style>body{background:#061014;color:#e6f7ff;font:15px Arial;margin:0;padding:32px}.wrap{max-width:1100px;margin:auto}.panel{background:#0a181d;border:1px solid #1d5665;border-radius:12px;padding:22px;margin:18px 0}.sev{font-weight:bold}.critical{color:#ff5270}.high{color:#ff8452}.medium{color:#ffd45b}.low{color:#56cbe5}.normal{color:#45e093}table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #18363e;text-align:left}button,a{background:#09323e;color:#7be9ff;border:1px solid #21b7d1;padding:10px;text-decoration:none;border-radius:5px}.muted{color:#83aeb9}</style><main class=wrap><a href="{{ url_for('main.dashboard') }}">Dashboard</a><h1>Threat Analysis</h1><p class=muted>Authentication telemetry is collected and assessed automatically. ML output, deterministic indicators, derived risk, and alert severity are separate.</p>{% with messages=get_flashed_messages() %}{% for m in messages %}<div class=panel>{{m}}</div>{% endfor %}{% endwith %}{% if latest %}<section class=panel><h2>Latest Authentication Event #{{latest.id}}</h2><p><b>{{latest.login_log.email}}</b> · {{latest.authentication_result}} · {{latest.login_log.ip_address}} · {{latest.created_at}}</p><p>ML: {{latest.ml_classification}} ({{'%.3f'|format(latest.ml_risk_score)}}) · Derived risk: {{'%.3f'|format(latest.derived_risk_score)}} · <span class="sev {{latest.severity}}">{{latest.severity|upper}}</span></p><p>Indicators: {{latest.indicators}}</p></section>{% else %}<section class=panel>No authentication events have been recorded yet.</section>{% endif %}<section class=panel><h2>Safe demonstration</h2><p class=muted>Generates local sample authentication telemetry through this same pipeline; no external system is contacted.</p><form method=post action="{{url_for('main.simulate_authentication')}}"><input type=hidden name=csrf_token value="{{csrf_token()}}"><button name=profile value=failed_burst>Simulate failed burst</button> <button name=profile value=new_device>Simulate new device</button> <button name=profile value=off_hours>Simulate off-hours login</button></form></section><section class=panel><h2>Recent Security Events</h2><table><tr><th>Time</th><th>User</th><th>Result</th><th>ML</th><th>Risk</th><th>Severity</th><th>Indicators</th></tr>{% for e in events %}<tr><td>{{e.created_at}}</td><td>{{e.login_log.email}}</td><td>{{e.authentication_result}}</td><td>{{e.ml_classification}}</td><td>{{'%.3f'|format(e.derived_risk_score)}}</td><td class="sev {{e.severity}}">{{e.severity|upper}}</td><td>{{e.indicators}}</td></tr>{% endfor %}</table></section></main>"""
+
+
 @main_bp.route("/ids/predict", methods=["GET", "POST"])
+@login_required
+def threat_analysis():
+    if request.method == "POST":
+        flash("The latest authentication telemetry is analyzed automatically.")
+        return redirect(url_for("main.threat_analysis"))
+    events = SecurityEvent.query.order_by(SecurityEvent.created_at.desc()).limit(25).all()
+    if not current_user.is_admin():
+        events = [event for event in events if event.user_id == current_user.id]
+    return render_template_string(THREAT_ANALYSIS_TEMPLATE, events=events, latest=events[0] if events else None)
+
+
+@main_bp.route("/ids/simulate", methods=["POST"])
+@login_required
+def simulate_authentication():
+    profiles = {"failed_burst": (False, "198.51.100.77", ["repeated_authentication_attempts", "demo_failed_burst"]), "new_device": (True, "203.0.113.21", ["unrecognized_device", "demo_new_device"]), "off_hours": (True, "203.0.113.33", ["unusual_login_time", "demo_off_hours"])}
+    profile = request.form.get("profile", "failed_burst")
+    success, ip_address, indicators = profiles.get(profile, profiles["failed_burst"])
+    fails, hour = current_user.failed_login_count + (5 if profile == "failed_burst" else 0), (2 if profile == "off_hours" else datetime.now(timezone.utc).hour)
+    risk = IntrusionPredictor(current_app.config["MODEL_PATH"]).predict_risk([float(hour), float(fails), 0.0, 0.0, float(profile == "new_device")])
+    log = LoginLog(user_id=current_user.id, email=current_user.email, ip_address=ip_address, user_agent="SOC safe demonstration", success=success, risk_score=risk, suspicious_indicators=";".join(indicators))
+    db.session.add(log); db.session.flush()
+    SecurityService.analyze_authentication(login_log_id=log.id, user_id=current_user.id, success=success, ml_risk_score=risk, indicators=indicators)
+    SecurityService.audit(current_user.id, "SAFE_TELEMETRY_SIMULATION", "LoginLog", str(log.id), profile)
+    db.session.commit(); flash("Safe demonstration telemetry was generated and analyzed.")
+    return redirect(url_for("main.threat_analysis"))
+
+
+@main_bp.route("/ids/legacy-predict", methods=["GET", "POST"])
 @login_required
 def predict_ids():
 

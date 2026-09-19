@@ -33,6 +33,7 @@ class Config:
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=int(os.getenv("SESSION_LIFETIME_MINUTES", "30")))
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = _bool_env("SESSION_COOKIE_SECURE", False)
     LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5 per minute")
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
     FAILED_LOGIN_THRESHOLD = int(os.getenv("FAILED_LOGIN_THRESHOLD", "5"))
@@ -45,6 +46,19 @@ class Config:
     ML_DIR = BASE_DIR / "ml"
     MODEL_PATH = ML_DIR / "random_forest_ids.joblib"
     METRICS_PATH = ML_DIR / "model_metrics.txt"
+    MAIL_SERVER = os.getenv("MAIL_SERVER", "")
+    MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
+    MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
+    MAIL_USE_TLS = _bool_env("MAIL_USE_TLS", True)
+    # Gmail and most authenticated SMTP relays require an envelope sender that
+    # belongs to the authenticated account.  An explicit value can still be
+    # supplied for providers that support verified sender identities.
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER") or os.getenv("MAIL_USERNAME", "")
+    APP_BASE_URL = os.getenv("APP_BASE_URL", "")
+    PASSWORD_RESET_MINUTES = int(os.getenv("PASSWORD_RESET_MINUTES", "30"))
+    # Keep operational SMTP diagnostics visible during local development.
+    LOG_TO_CONSOLE = _bool_env("LOG_TO_CONSOLE", True)
 
 
 class TestingConfig(Config):

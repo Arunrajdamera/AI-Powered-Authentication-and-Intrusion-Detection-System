@@ -3,12 +3,67 @@ from datetime import datetime, timedelta, timezone
 from flask import current_app
 
 from app import db
-from models.alert import SecurityAlert
+from models.alert import SecurityAlert, SecurityEvent
 from models.log import AuditLog
 from models.user import User
 
 
 class SecurityService:
+    @staticmethod
+    def analyze_authentication(
+        *,
+        login_log_id: int,
+        user_id: int | None,
+        success: bool,
+        ml_risk_score: float,
+        indicators: list[str],
+    ) -> SecurityEvent:
+        """Persist the explainable correlation layer around the IDS model result.
+
+        The ML score remains distinct from deterministic indicator weighting and
+        the analyst-facing severity assigned below.
+        """
+        normalized_ml_score = max(0.0, min(float(ml_risk_score), 1.0))
+        rule_bonus = min(0.30, 0.04 * len(indicators))
+        if not success:
+            rule_bonus += 0.08
+        derived_score = min(1.0, normalized_ml_score + rule_bonus)
+        if derived_score >= 0.85:
+            severity = "critical"
+        elif derived_score >= 0.65:
+            severity = "high"
+        elif derived_score >= 0.40:
+            severity = "medium"
+        elif derived_score >= 0.20:
+            severity = "low"
+        else:
+            severity = "normal"
+        ml_classification = "SUSPICIOUS" if normalized_ml_score >= 0.50 else "NORMAL"
+        event = SecurityEvent(
+            login_log_id=login_log_id,
+            user_id=user_id,
+            authentication_result="SUCCESS" if success else "FAILED",
+            ml_risk_score=normalized_ml_score,
+            ml_classification=ml_classification,
+            derived_risk_score=derived_score,
+            severity=severity,
+            indicators=";".join(indicators) or "none",
+        )
+        db.session.add(event)
+        db.session.flush()
+        if severity in {"medium", "high", "critical"}:
+            SecurityService.create_alert(
+                user_id=user_id,
+                login_log_id=login_log_id,
+                incident_class="AUTHENTICATION_RISK",
+                severity=severity,
+                description=(
+                    f"{event.authentication_result} authentication correlated as {severity.upper()}. "
+                    f"ML classification={ml_classification}; ML score={normalized_ml_score:.3f}; "
+                    f"derived score={derived_score:.3f}; indicators={event.indicators}."
+                ),
+            )
+        return event
     @staticmethod
     def register_failed_login(user: User | None, email: str, risk_score: float, login_log_id: int | None) -> SecurityAlert | None:
         threshold = current_app.config["FAILED_LOGIN_THRESHOLD"]
