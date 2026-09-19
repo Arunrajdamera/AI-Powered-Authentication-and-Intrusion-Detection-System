@@ -1532,7 +1532,7 @@ def portal():
                 </div>
 
                 <div class="panel-subtitle">
-                    Authentication accounts under monitoring
+                    User List of authentication accounts under monitoring
                 </div>
 
             </div>
