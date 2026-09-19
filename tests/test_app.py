@@ -95,7 +95,7 @@ class SiemAppTestCase(unittest.TestCase):
         response = self.client.get("/admin/")
         self.assertEqual(response.status_code, 200)
         body = response.get_data(as_text=True)
-        self.assertIn("User List", body)
+        self.assertIn("User Monitoring", body)
         self.assertIn("analyst@example.com", body)
 
     def test_ids_prediction_page_classifies_normal_and_attack(self):
@@ -109,7 +109,7 @@ class SiemAppTestCase(unittest.TestCase):
             data={"login_hour": "12", "preceding_fails": "0"},
         )
         self.assertEqual(normal.status_code, 200)
-        self.assertIn("Normal", normal.get_data(as_text=True))
+        self.assertIn("NORMAL ACTIVITY", normal.get_data(as_text=True))
 
         attack = self.client.post(
             "/ids/predict",
@@ -122,7 +122,7 @@ class SiemAppTestCase(unittest.TestCase):
             },
         )
         self.assertEqual(attack.status_code, 200)
-        self.assertIn("Attack", attack.get_data(as_text=True))
+        self.assertIn("ATTACK DETECTED", attack.get_data(as_text=True))
 
 
 if __name__ == "__main__":
