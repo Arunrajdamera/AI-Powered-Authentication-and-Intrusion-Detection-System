@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app import db
+from extensions import db
 
 
 class SecurityAlert(db.Model):
@@ -42,3 +42,4 @@ class SecurityEvent(db.Model):
 
     login_log = db.relationship("LoginLog", lazy="joined")
     user = db.relationship("User", lazy="joined")
+

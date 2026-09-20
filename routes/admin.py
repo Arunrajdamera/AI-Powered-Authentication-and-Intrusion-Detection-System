@@ -10,7 +10,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
-from app import db
+from extensions import db
 from models.alert import SecurityAlert
 from models.log import AuditLog, LoginLog
 from models.user import User
@@ -1834,3 +1834,4 @@ def _csv_response(
     ] = f"attachment; filename={filename}"
 
     return response
+

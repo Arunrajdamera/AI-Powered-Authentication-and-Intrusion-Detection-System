@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import current_app
 
-from app import db
+from extensions import db
 from models.alert import SecurityAlert, SecurityEvent
 from models.log import AuditLog
 from models.user import User
@@ -148,3 +148,4 @@ class SecurityService:
         )
         db.session.add(entry)
         return entry
+

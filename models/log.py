@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app import db
+from extensions import db
 
 
 class LoginLog(db.Model):
@@ -47,3 +47,4 @@ class PasswordResetToken(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     user = db.relationship("User", lazy="joined")
+

@@ -2,19 +2,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 from flask import Flask
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from flask_login import LoginManager
-from flask_sqlalchemy import SQLAlchemy
-from flask_wtf import CSRFProtect
 
 from config import Config
+from extensions import db, login_manager, csrf, limiter
 
 
-db = SQLAlchemy()
-login_manager = LoginManager()
-csrf = CSRFProtect()
-limiter = Limiter(key_func=get_remote_address)
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
@@ -79,3 +71,4 @@ app = create_app()
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=False)
+

@@ -26,7 +26,7 @@ from flask_login import (
     logout_user,
 )
 
-from app import db, limiter
+from extensions import db, limiter
 from ml.predict import IntrusionPredictor
 from models.log import LoginLog, PasswordResetToken
 from models.user import Role, User
@@ -2364,3 +2364,4 @@ def _is_suspicious_ip(
         or parsed.is_reserved
         or parsed.is_multicast
     )
+

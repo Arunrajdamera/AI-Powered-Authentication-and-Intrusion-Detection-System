@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app import db
+from extensions import db
 
 
 class Role(db.Model):
@@ -62,3 +62,4 @@ class User(UserMixin, db.Model):
         if self.locked_until is None:
             return True
         return self.locked_until > datetime.now(timezone.utc).replace(tzinfo=None)
+

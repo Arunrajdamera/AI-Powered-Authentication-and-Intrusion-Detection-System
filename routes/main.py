@@ -10,7 +10,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
-from app import db
+from extensions import db
 from ml.predict import IntrusionPredictor
 from models.alert import SecurityAlert, SecurityEvent
 from models.log import AuditLog, LoginLog
@@ -1338,3 +1338,4 @@ def predict_ids():
         threat_level=threat_level,
         indicators=indicators,
     )
+
