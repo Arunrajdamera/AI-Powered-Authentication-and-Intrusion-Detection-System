@@ -17,11 +17,15 @@ def _bool_env(name: str, default: bool) -> bool:
 
 
 def _database_uri() -> str:
-    uri = os.getenv("SQLALCHEMY_DATABASE_URI")
+    uri = os.getenv("DATABASE_URL") or os.getenv("SQLALCHEMY_DATABASE_URI")
+
     if not uri:
         return f"sqlite:///{BASE_DIR / 'database' / 'siem_ids.db'}"
-    if uri.startswith("sqlite:///") and not Path(uri.removeprefix("sqlite:///")).is_absolute():
-        return f"sqlite:///{BASE_DIR / uri.removeprefix('sqlite:///')}"
+
+    # Railway/PostgreSQL may provide postgres://
+    if uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+
     return uri
 
 

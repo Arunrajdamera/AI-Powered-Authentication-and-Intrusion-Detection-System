@@ -50,6 +50,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
 
+    with app.app_context():
+        db.create_all()
+
     return app
 
 
