@@ -5,7 +5,7 @@ An AI-assisted cybersecurity platform that combines secure authentication, authe
 ## Live Deployment
 
 **Production Application:**  
-https://ai-powered-authentication-and-intrusion-detection-production.up.railway.app/
+https://ai-powered-authentication-and-intrusion-detectio-production.up.railway.app/login
 
 **GitHub Repository:**  
 https://github.com/Arunrajdamera/AI-Powered-Authentication-and-Intrusion-Detection-System
