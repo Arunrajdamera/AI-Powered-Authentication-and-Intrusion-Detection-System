@@ -56,7 +56,6 @@ htmlcov/
 .nox/
 
 # Machine learning generated artifacts
-ml/*.joblib
 ml/*.pkl
 ml/synthetic_auth_events.csv
 ml/model_metrics.txt
