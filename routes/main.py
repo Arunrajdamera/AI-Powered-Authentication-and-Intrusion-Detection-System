@@ -1096,13 +1096,13 @@ def predict_ids():
                     {% if result == "Attack" %}
 
                         <div class="attack-text">
-                            ⚠ ATTACK DETECTED
+                            ⚠ Attack Detected
                         </div>
 
                     {% else %}
 
                         <div class="normal-text">
-                            ✓ NORMAL ACTIVITY
+                            ✓ Normal Activity
                         </div>
 
                     {% endif %}
