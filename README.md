@@ -1,366 +1,537 @@
-# AI-Powered Authentication Monitoring and Intrusion Detection System
+# AI-Powered Authentication and Intrusion Detection System
+
+An AI-assisted cybersecurity platform that combines secure authentication, authentication telemetry, machine-learning-based intrusion detection, risk scoring, security alerting, audit logging, and SOC-style monitoring in a single Flask application.
+
+## Live Deployment
+
+**Production Application:**  
+https://ai-powered-authentication-and-intrusion-detection-production.up.railway.app/
+
+**GitHub Repository:**  
+https://github.com/Arunrajdamera/AI-Powered-Authentication-and-Intrusion-Detection-System
+
+---
 
 ## Project Overview
 
-AI-Driven SIEM with Random Forest IDS is a Flask-based cybersecurity web application for authentication analytics. It monitors login activity, records telemetry, generates audit logs, raises security alerts, supports administrator review, exports CSV evidence, and provides an IDS prediction page that classifies authentication behavior as `Normal` or `Attack`.
+The system demonstrates how authentication security and intrusion detection can work together as a continuous security monitoring pipeline.
 
-The project combines secure web development, database-backed monitoring, and machine learning into a complete B.Tech submission and portfolio-ready application.
+The application:
 
-## Problem Statement
+1. Authenticates users securely.
+2. Records authentication telemetry.
+3. Extracts security-relevant indicators.
+4. Applies a machine-learning intrusion detection model.
+5. Combines ML output with deterministic security indicators.
+6. Calculates a derived risk score.
+7. Assigns an alert severity.
+8. Generates security alerts for suspicious activity.
+9. Records security actions in an audit trail.
+10. Presents the results through a SOC-style dashboard.
 
-Traditional login systems usually validate credentials but do not provide enough visibility into failed attempts, suspicious login behavior, account lockouts, or incident history. Manual log analysis is slow and unreliable. This project solves that problem by building a lightweight SIEM-style application that records authentication telemetry, detects suspicious events, and integrates a Random Forest based IDS model.
+### Detection Pipeline
 
-## Objectives
+```text
+User Authentication
+        |
+        v
+Authentication Telemetry
+        |
+        v
+Feature Extraction
+        |
+        v
+Machine Learning Detection
+        |
+        +----------------------+
+        |                      |
+        v                      v
+ML Classification       Security Indicators
+        |                      |
+        +----------+-----------+
+                   |
+                   v
+             Risk Calculation
+                   |
+                   v
+             Severity Engine
+                   |
+          +--------+--------+
+          |                 |
+          v                 v
+    Security Alert      Audit Logging
+          |
+          v
+      SOC Dashboard
+```
 
-- Implement secure user registration, login, logout, and session handling.
-- Store users, roles, login logs, audit logs, and security alerts in SQLite.
-- Track failed logins and lock accounts after repeated invalid attempts.
-- Provide an administrator dashboard for monitoring users, alerts, and telemetry.
-- Train and integrate a Random Forest IDS model.
-- Classify authentication traffic as `Normal` or `Attack`.
-- Export SIEM records as CSV files.
-- Provide automated tests and academic documentation.
+---
 
-## Features
+## Key Features
 
-- Flask authentication system
-- Role-based admin access
-- User management visibility
-- SQLite database integration
+### Secure Authentication
+
+- User registration and login
 - Password hashing
-- CSRF-protected forms
-- Session expiry configuration
-- Login telemetry recording
-- Failed login lockout
-- Audit logging
-- Security alert generation and resolution
-- Random Forest IDS model
-- IDS prediction page
-- CSV exports for alerts and login logs
-- Automated unit tests
-- GitHub Actions test workflow
-- Academic report, diagrams, PPT content, viva Q&A, and synopsis
+- Session management
+- Role-based access control
+- Login attempt monitoring
+- Account protection mechanisms
+- Password reset workflow
+- CSRF protection
+- Rate limiting
 
-## Technology Stack
+### AI-Assisted Intrusion Detection
 
-| Layer | Technology |
-|---|---|
-| Language | Python |
-| Web Framework | Flask |
-| ORM | Flask-SQLAlchemy |
-| Authentication | Flask-Login |
-| CSRF Protection | Flask-WTF |
-| Rate Limiting | Flask-Limiter |
-| Database | SQLite |
-| Machine Learning | Scikit-learn Random Forest |
-| Data Processing | Pandas, NumPy |
-| Model Serialization | Joblib |
-| Testing | Python unittest |
-| CI | GitHub Actions |
+- Random Forest based intrusion detection
+- Authentication feature extraction
+- ML classification
+- ML risk scoring
+- Suspicious authentication detection
+- Behavioral indicators
+- Derived risk calculation
 
-## System Architecture
+### Security Monitoring
 
-```mermaid
-flowchart TB
-    Browser["User / Admin Browser"] --> Flask["Flask Web Application"]
-    Flask --> Auth["Authentication Module"]
-    Flask --> Admin["Admin Dashboard"]
-    Flask --> IDS["IDS Prediction Page"]
-    Auth --> Security["Security Service"]
-    IDS --> Predictor["Random Forest Predictor"]
-    Predictor --> Model["Joblib Model File"]
-    Security --> DB["SQLite Database"]
-    Admin --> DB
-    Auth --> DB
-    DB --> Users["Users / Roles"]
-    DB --> Logs["Login Logs"]
-    DB --> Audit["Audit Logs"]
-    DB --> Alerts["Security Alerts"]
-    Admin --> CSV["CSV Export Service"]
-```
+- SOC Command Center dashboard
+- Authentication event monitoring
+- Threat severity visualization
+- Open security alerts
+- Audit event tracking
+- Recent security event monitoring
+- IDS analysis interface
 
-More diagrams are available in [`docs/02_DIAGRAMS.md`](docs/02_DIAGRAMS.md).
+### Security Alerts
 
-## Installation Guide
+The application generates alerts based on authentication and detection signals, including:
 
-### 1. Clone the Repository
+- Repeated authentication attempts
+- Suspicious authentication behavior
+- Unknown account login attempts
+- Unusual login time
+- New or unrecognized devices
+- ML-based suspicious activity
 
-```bash
-git clone <repository-url>
-cd "Cryptography Algorithms Implementation"
-```
+### Safe Demonstration Mode
 
-### 2. Create a Virtual Environment
+The Threat Analysis interface includes controlled demonstration telemetry for safely testing the detection pipeline.
 
-```bash
-python -m venv .venv
-```
+Available demonstrations include:
 
-Windows:
+- Failed authentication burst
+- New device login
+- Off-hours login
 
-```powershell
-.\.venv\Scripts\activate
-```
+These simulations generate local telemetry through the same processing pipeline without contacting external systems.
 
-Linux/macOS:
+---
 
-```bash
-source .venv/bin/activate
-```
+## Machine Learning
 
-### 3. Install Dependencies
+The project uses a Random Forest classifier as the baseline intrusion detection model.
 
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment
-
-Copy the example environment file:
-
-```bash
-copy .env.example .env
-```
-
-On Linux/macOS:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set secure values for:
-
-- `SECRET_KEY`
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
-
-### 5. Initialize Database and Admin User
-
-```bash
-python scripts/seed_admin.py
-```
-
-### 6. Train the IDS Model
-
-```bash
-python ml/train_model.py
-```
-
-### 7. Start the Application
-
-```bash
-python run.py
-```
-
-Open:
-
-```text
-http://127.0.0.1:5000/login
-```
-
-Windows users can also run:
-
-```powershell
-.\start_web_server.bat
-```
-
-## Usage Guide
-
-### Standard User Flow
-
-1. Open `/register`.
-2. Create a user account with a strong password.
-3. Login through `/login`.
-4. View personal login telemetry on the dashboard.
-5. Open `/ids/predict` to classify sample authentication activity.
-6. Logout using the dashboard logout button.
-
-### Admin Flow
-
-1. Login using the admin account configured in `.env`.
-2. View the admin dashboard at `/admin/`.
-3. Review total users, login events, open alerts, and audit logs.
-4. Check the visible user list.
-5. Resolve security alerts.
-6. Download CSV exports.
-
-## Admin Login Credentials
-
-Admin credentials are configured through environment variables:
-
-```text
-ADMIN_EMAIL=<your-admin-email>
-ADMIN_PASSWORD=<your-secure-admin-password>
-```
-
-For local demonstration, set these values in your private `.env` file. Do not commit `.env` to GitHub.
-
-## IDS Prediction Examples
-
-Open:
-
-```text
-http://127.0.0.1:5000/ids/predict
-```
-
-### Normal Example
-
-| Field | Value |
-|---|---|
-| Login Hour | 12 |
-| Previous Failed Attempts | 0 |
-| Suspicious IP | No |
-| Country Mismatch | No |
-| New Device | No |
-
-Expected result:
-
-```text
-Normal
-```
-
-### Attack Example
-
-| Field | Value |
-|---|---|
-| Login Hour | 2 |
-| Previous Failed Attempts | 8 |
-| Suspicious IP | Yes |
-| Country Mismatch | Yes |
-| New Device | Yes |
-
-Expected result:
-
-```text
-Attack
-```
-
-## Validation Results
-
-Current project validation:
+### Baseline Model Metrics
 
 | Metric | Result |
 |---|---:|
-| Tests Passing | 8 |
 | Accuracy | 88.80% |
 | Precision | 66.06% |
 | Recall | 88.62% |
 | F1 Score | 75.69% |
 
-Run tests:
+These metrics represent the evaluated baseline model and should not be interpreted as production detection accuracy.
+
+### Detection Flow
+
+```text
+Authentication Event
+        |
+        v
+Feature Extraction
+        |
+        v
+Random Forest Model
+        |
+        v
+NORMAL / SUSPICIOUS
+        |
+        v
+ML Risk Score
+        |
+        v
+Deterministic Security Indicators
+        |
+        v
+Derived Risk Score
+        |
+        v
+NORMAL / LOW / MEDIUM / HIGH / CRITICAL
+```
+
+---
+
+## Technology Stack
+
+### Backend
+
+- Python
+- Flask
+- Flask-SQLAlchemy
+- Flask-Login
+- Flask-WTF
+- Flask-Limiter
+- Gunicorn
+
+### Database
+
+- PostgreSQL for production
+- SQLite support for local development
+
+### Machine Learning
+
+- Scikit-learn
+- Random Forest
+- Pandas
+- NumPy
+- Joblib
+
+### Security
+
+- Password hashing
+- CSRF protection
+- Rate limiting
+- Role-based access control
+- Authentication monitoring
+- Security alerting
+- Audit logging
+- Intrusion detection
+
+### Deployment
+
+- Railway
+- PostgreSQL
+- Gunicorn
+
+---
+
+## Project Architecture
+
+```text
+Browser
+   |
+   v
+Flask Application
+   |
+   +----------------------+
+   |          |           |
+   v          v           v
+Auth       SOC Dashboard  Threat Analysis
+   |          |           |
+   +----------+-----------+
+              |
+              v
+       Security Service
+              |
+       +------+------+
+       |             |
+       v             v
+   ML Predictor   Security Indicators
+       |             |
+       +------+------+
+              |
+              v
+        Risk Calculation
+              |
+              v
+      Security Event
+              |
+       +------+------+
+       |             |
+       v             v
+ Security Alert   Audit Log
+       |
+       v
+ PostgreSQL
+```
+
+---
+
+## Database Architecture
+
+The production deployment uses PostgreSQL.
+
+The system contains the following main database entities:
+
+```text
+Users
+  |
+  +-- Roles
+  |
+  +-- Login Logs
+  |
+  +-- Security Events
+  |
+  +-- Security Alerts
+  |
+  +-- Audit Logs
+  |
+  +-- Password Reset Tokens
+```
+
+The application uses `extensions.py` for shared Flask extensions such as the database, login manager, CSRF protection, and rate limiter.
+
+This keeps the application factory and models separated and avoids circular-import problems.
+
+---
+
+## Security Event Model
+
+The system separates detection information into multiple layers.
+
+### Authentication Result
+
+```text
+SUCCESS
+FAILED
+```
+
+### ML Classification
+
+```text
+NORMAL
+SUSPICIOUS
+```
+
+### Risk
+
+The system derives a risk score using the ML output together with security indicators.
+
+### Severity
+
+```text
+NORMAL
+LOW
+MEDIUM
+HIGH
+CRITICAL
+```
+
+### Alert State
+
+```text
+OPEN
+RESOLVED
+```
+
+This separation makes individual detection decisions easier to investigate and audit.
+
+---
+
+## Audit Logging
+
+Security-sensitive actions are recorded through the audit subsystem.
+
+Examples include:
+
+- Login events
+- Logout events
+- Authentication activity
+- Safe telemetry simulations
+- Administrative actions
+- Security-related operations
+
+The audit trail provides a record for investigating system activity.
+
+---
+
+## Password Recovery
+
+The password recovery workflow uses security controls including:
+
+- Expiring reset tokens
+- Single-use reset tokens
+- Hashed token storage
+- Generic reset responses
+- Secure password hashing
+
+Sensitive configuration such as SMTP credentials, application secrets, and database credentials must remain in environment variables and must never be committed to GitHub.
+
+---
+
+## Production Deployment
+
+The current application is deployed on Railway.
+
+```text
+Railway
+   |
+   +---- Flask Application
+   |       |
+   |       +---- Gunicorn
+   |
+   +---- PostgreSQL
+```
+
+The application reads the production database connection from `DATABASE_URL`.
+
+Gunicorn runs the Flask application using:
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py"
+gunicorn app:app --bind 0.0.0.0:$PORT
 ```
 
-## Project Structure
+---
+
+## Local Setup
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Arunrajdamera/AI-Powered-Authentication-and-Intrusion-Detection-System.git
+cd AI-Powered-Authentication-and-Intrusion-Detection-System
+```
+
+### 2. Create a virtual environment
+
+Windows:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure environment variables
+
+Create a local `.env` file with the required application configuration.
+
+At minimum, configure the application secret and database connection appropriate for your environment.
+
+Never commit:
 
 ```text
-.
-├── .github/workflows/tests.yml
-├── docs/
-│   ├── 01_PROJECT_REPORT.md
-│   ├── 02_DIAGRAMS.md
-│   ├── 03_PPT_CONTENT.md
-│   ├── 04_SCREENSHOT_GUIDE.md
-│   ├── 05_VIVA_QA.md
-│   └── 06_SYNOPSIS_ABSTRACT_REFERENCES.md
-├── ml/
-│   ├── dataset_generator.py
-│   ├── predict.py
-│   └── train_model.py
-├── models/
-│   ├── alert.py
-│   ├── log.py
-│   └── user.py
-├── routes/
-│   ├── admin.py
-│   ├── auth.py
-│   └── main.py
-├── scripts/
-│   └── seed_admin.py
-├── services/
-│   ├── report_service.py
-│   └── security_service.py
-├── tests/
-│   └── test_app.py
-├── app.py
-├── config.py
-├── run.py
-├── requirements.txt
-└── start_web_server.bat
+.env
+database credentials
+SMTP passwords
+API keys
+private secrets
 ```
 
-Generated runtime files such as `.env`, `database/*.db`, `logs/`, cache folders, and local model/data artifacts are ignored by Git.
+### 5. Run the application
 
-## Screenshots
+```bash
+python app.py
+```
 
-Add project screenshots in the `screenshots/` folder for:
+---
 
-- Login page
-- Registration page
-- User dashboard
-- Admin dashboard
-- Security alerts
-- IDS prediction result: Normal
-- IDS prediction result: Attack
-- CSV export
-- Database tables
-- Test output
+## Demonstration Workflow
 
-See [`docs/04_SCREENSHOT_GUIDE.md`](docs/04_SCREENSHOT_GUIDE.md) for a complete screenshot checklist.
+For a complete project demonstration:
 
-## Documentation
+1. Open the live application.
+2. Sign in with an authorized account.
+3. Open the SOC Command Center.
+4. Review authentication statistics.
+5. Open Threat Analysis.
+6. Run **Simulate failed burst**.
+7. Run **Simulate new device**.
+8. Run **Simulate off-hours login**.
+9. Review the generated security events.
+10. Observe ML classification and risk scores.
+11. Review generated security alerts.
+12. Review audit activity.
+13. Demonstrate CSV export.
+14. Demonstrate logout and role-based access.
 
-Academic submission materials are available in the `docs/` folder:
+---
 
-- Complete B.Tech project report
-- Architecture diagram
-- ER diagram
-- DFD diagrams
-- Use case diagram
-- Activity diagram
-- PPT content
-- Viva questions and answers
-- Synopsis and abstract
-- IEEE-style references
+## Example Detection
 
-## Future Scope
-
-- Add multi-factor authentication for admin accounts.
-- Use real authentication telemetry datasets.
-- Add charts and visual analytics.
-- Integrate email or SMS alert notifications.
-- Add IP reputation and geolocation lookup.
-- Replace SQLite with PostgreSQL for production deployment.
-- Deploy with Gunicorn/uWSGI and a reverse proxy.
-- Add external log ingestion APIs.
-
-## Conclusion
-
-This project demonstrates a complete authentication-focused SIEM system with secure Flask authentication, structured logging, account lockout, security alerts, CSV reporting, and Random Forest based IDS classification. It is suitable for academic submission, GitHub portfolio presentation, and further cybersecurity research extension.
-
-## SOC telemetry upgrade
-
-The primary IDS workflow is now `/ids/predict`, which displays automatically collected authentication events rather than requiring an analyst to enter attack values. Each login produces a `LoginLog`, then the application derives the five existing ML features (UTC hour, prior failures, IP signal, country mismatch, and device signal), persists the ML result, deterministic indicators, derived risk score, and analyst severity in a `SecurityEvent`. ML classification is deliberately displayed separately from rule correlation and the final severity (`NORMAL`, `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`). Alerts are created for medium-or-higher correlated risk.
-
-The Threat Analysis page includes safe local demonstration controls for a failed-login burst, new device, and off-hours event. They produce real records through the same pipeline and never target an external system.
-
-### Password recovery
-
-`/forgot-password` returns the same generic response for every address. Reset tokens are 256-bit URL-safe values, stored only as SHA-256 hashes, expire after about 30 minutes, become invalid when another reset is requested, and become single-use after a successful password change. Links are sent only via configured SMTP and are never shown in the UI.
-
-Configure these private `.env` values for email delivery:
+A controlled failed authentication burst can produce a result similar to:
 
 ```text
-MAIL_SERVER=smtp.example.com
-MAIL_PORT=587
-MAIL_USERNAME=your-smtp-username
-MAIL_PASSWORD=your-smtp-password
-MAIL_USE_TLS=true
-MAIL_DEFAULT_SENDER=no-reply@example.com
-APP_BASE_URL=http://127.0.0.1:5000
-PASSWORD_RESET_MINUTES=30
+Authentication Result: FAILED
+ML Classification: SUSPICIOUS
+ML Risk: ~0.865
+Derived Risk: 1.000
+Severity: CRITICAL
 ```
 
-If SMTP is unavailable the request remains non-disclosing; the app logs the delivery failure and does not reveal a recovery URL. Set `SESSION_COOKIE_SECURE=true` for HTTPS deployments. This remains an academic PoC: SQLite, local rate limiting, request-supplied country metadata, and synthetic ML training data are not enterprise SIEM controls.
+The exact values depend on the generated telemetry and model output.
+
+---
+
+## Project Objectives
+
+- Build a secure authentication platform.
+- Collect authentication security telemetry.
+- Apply machine learning to authentication behavior.
+- Combine ML predictions with deterministic security indicators.
+- Calculate actionable risk levels.
+- Generate security alerts.
+- Provide SOC-style security monitoring.
+- Maintain an auditable security event history.
+- Deploy the application using PostgreSQL and Gunicorn.
+
+---
+
+## Current Scope
+
+This project focuses primarily on authentication telemetry and intrusion detection.
+
+It is designed as a cybersecurity academic and portfolio project rather than a replacement for an enterprise SIEM or production SOC platform.
+
+The model's performance depends on the training data, engineered features, detection logic, and deployment environment.
+
+---
+
+## Future Enhancements
+
+Potential future improvements include:
+
+- Multi-factor authentication
+- IP reputation and threat-intelligence enrichment
+- Redis-backed distributed rate limiting
+- Real-world authentication telemetry datasets
+- Expanded endpoint and network telemetry
+- Advanced detection rules
+- Analyst case management
+- External SIEM integrations
+- Model monitoring and retraining
+- Detection model drift analysis
+- Containerized deployment
+- Expanded security analytics
+
+---
+
+## Author
+
+**Damera Arunraj**
+
+B.Tech Computer Science (Cyber Security)  
+GITAM School of Technology, Visakhapatnam
+
+**GitHub:**  
+https://github.com/Arunrajdamera
+
+**LinkedIn:**  
+https://www.linkedin.com/in/arunrajdamera20/
+
+---
+
+## License
+
+This project is intended for educational, research, academic, and portfolio demonstration purposes.
